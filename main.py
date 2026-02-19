@@ -14,10 +14,11 @@ import pandas as pd
 from alpaca.trading.client import TradingClient
 
 import config
-from trading import (
-    Order, Portfolio, get_current_stock_price, download_data,
-    train_RandomForest_model, train_XGB_model, final_vote
-)
+from trading.order import Order
+from trading.portfolio import Portfolio
+from trading.data_fetcher import get_current_stock_price, download_data
+from trading.models import train_RandomForest_model, train_XGB_model, final_vote
+
 from utils.helpers import buy, sell_market, is_market_open, return_time, calculate_position_size
 
 def initialize_trading_client():
