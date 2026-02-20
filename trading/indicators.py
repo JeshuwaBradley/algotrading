@@ -76,7 +76,7 @@ def calculate_technical_indicators(data):
                         "BBU_8_2_2": "Upper Band",
                         "BBM_8_2_2": "Middle Band",
                         "BBB_8_2_2": "Band Width"}, inplace=True)
-    bb.drop(["BBP_8_2.0_2.0"], inplace=True, axis=1)
+    bb.drop(["BBP_8_2_2"], inplace=True, axis=1)
     data = pd.concat([data, bb], axis=1).reindex(data.index)
 
     # Stochastic Oscillator
