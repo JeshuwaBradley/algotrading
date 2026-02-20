@@ -71,7 +71,7 @@ def calculate_technical_indicators(data):
                          "MACDs_5_15_3": "Signal_Line"}, inplace=True)
 
     # Bollinger Bands
-    bb = ta.bbands(data['Close'], length=8, std=1.5
+    bb = ta.bbands(data['Close'], length=8, std=1.5)
     bb.rename(columns={ "BBL_8_1.5": "Lower Band",
                         "BBU_8_1.5": "Upper Band",
                         "BBM_8_1.5": "Middle Band",
