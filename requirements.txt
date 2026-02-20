@@ -1,9 +1,9 @@
-alpaca-py==0.8.0
+alpaca-py
 yfinance==0.2.28
 pandas==2.2.2
 numpy==1.26.4
 xgboost==2.1.0
-pandas_ta
+pandas_ta_classic
 scikit-learn==1.4.0
 scipy==1.12.0
 beautifulsoup4==4.12.3
