@@ -72,6 +72,7 @@ def calculate_technical_indicators(data):
 
     # Bollinger Bands
     bb = ta.bbands(data['Close'], length=8, std=1.5)
+    print(bb)
     bb.rename(columns={ "BBL_8_2_2": "Lower Band",
                         "BBU_8_2_2": "Upper Band",
                         "BBM_8_2_2": "Middle Band",
