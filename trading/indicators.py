@@ -71,18 +71,17 @@ def calculate_technical_indicators(data):
                          "MACDs_5_15_3": "Signal_Line"}, inplace=True)
 
     # Bollinger Bands
-    bb = ta.bbands(data['Close'], length=8, std=1.5)
-    print(bb)
-    bb.rename(columns={ "BBL_8_2_2": "Lower Band",
-                        "BBU_8_2_2": "Upper Band",
-                        "BBM_8_2_2": "Middle Band",
-                        "BBB_8_2_2": "Band Width"}, inplace=True)
-    bb.drop(["BBP_8_2_2"], inplace=True, axis=1)
+    bb = ta.bbands(data['Close'], length=8, std=1.5
+    bb.rename(columns={ "BBL_8_1.5": "Lower Band",
+                        "BBU_8_1.5": "Upper Band",
+                        "BBM_8_1.5": "Middle Band",
+                        "BBB_8_1.5": "Band Width"}, inplace=True)
+    bb.drop(["BBP_8_1.5"], inplace=True, axis=1)
     data = pd.concat([data, bb], axis=1).reindex(data.index)
 
     # Stochastic Oscillator
     stoch_df = ta.stoch(data['High'], data['Low'], data['Close'], k=8, d=2, smooth_k=2)
-    stoch_df.rename(columns={"STOCHk_8_2_2": "k", "STOCHd_8_2_2": "d"}, inplace=True)
+    stoch_df.rename(columns={"STOCHk_8_1.5": "k", "STOCHd_8_1.5": "d"}, inplace=True)
     data = pd.concat([data, stoch_df], axis=1).reindex(data.index)
 
     # RSI
