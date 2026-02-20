@@ -17,7 +17,6 @@ def prepare_data(ticker, period):
     data = download_data(ticker, period)
     data = tomorrow(data)
     data = calculate_technical_indicators(data)
-    print(data)
     data = moving_average_strategy(data)
     data = implement_so_strategy(data)
     data = bb_macd_strategy(data)
