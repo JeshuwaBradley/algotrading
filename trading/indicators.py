@@ -81,7 +81,7 @@ def calculate_technical_indicators(data):
 
     # Stochastic Oscillator
     stoch_df = ta.stoch(data['High'], data['Low'], data['Close'], k=8, d=2, smooth_k=2)
-    stoch_df.rename(columns={"STOCHk_8_1.5": "k", "STOCHd_8_1.5": "d"}, inplace=True)
+    stoch_df.rename(columns={"STOCHk_8_2_2": "k", "STOCHd_8_2_2": "d"}, inplace=True)
     data = pd.concat([data, stoch_df], axis=1).reindex(data.index)
 
     # RSI
