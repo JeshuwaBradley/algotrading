@@ -1,5 +1,5 @@
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta_classic as ta
 import numpy as np
 from scipy.stats import linregress
 from typing import Tuple, List, Optional
@@ -122,12 +122,12 @@ class TechnicalIndicators:
         # Bollinger Bands
         bb = ta.bbands(data['Close'], length=8, std=1.5)
         bb.rename(columns={
-            "BBL_8_2.0_2.0": "Lower Band",
-            "BBU_8_2.0_2.0": "Upper Band",
-            "BBM_8_2.0_2.0": "Middle Band",
-            "BBB_8_2.0_2.0": "Band Width"
+            "BBL_8_1.5": "Lower Band",
+            "BBU_8_1.5": "Upper Band",
+            "BBM_8_1.5": "Middle Band",
+            "BBB_8_1.5": "Band Width"
         }, inplace=True)
-        bb.drop(["BBP_8_2.0_2.0"], inplace=True, axis=1)
+        bb.drop(["BBP_8_1.5"], inplace=True, axis=1)
         data = pd.concat([data, bb], axis=1).reindex(data.index)
         
         # Stochastic Oscillator
