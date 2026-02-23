@@ -3,6 +3,7 @@ import numpy as np
 from typing import List, Tuple, Optional, Dict
 from .indicators import TechnicalIndicators
 from .data_fetcher import DataFetcher
+import pandas_ta_classic as ta
 from config import config
 
 
