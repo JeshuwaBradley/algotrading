@@ -106,26 +106,14 @@ class DataFetcher:
         
         # Try primary method
         try:
-            url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
+            url = "https://stockanalysis.com/list/sp-500-stocks/"
+            response = requests.get(url)
             soup = BeautifulSoup(response.text, "html.parser")
-            
-            # Try different table selectors
-            table = soup.find("table", {"id": "constituents"})
-            if not table:
-                table = soup.find("table", {"class": "wikitable sortable"})
-            
-            if table:
-                rows = table.find_all("tr")[1:]  # Skip header
-                sp500 = []
-                for row in rows:
-                    cells = row.find_all('td')
-                    if cells:
-                        ticker = cells[0].text.strip()
-                        # Clean up ticker (remove exchanges in parentheses, etc.)
-                        ticker = ticker.replace('.', '-')  # Convert BRK.B to BRK-B for yfinance
-                        sp500.append(ticker)
+            table = soup.find("table", {"id": "main-table"})
+            rows = table.find_all("tr")[1:]
+            sp500 = []
+            for row in rows:
+                sp500.append(row.find_all('td')[1].text.strip())
                 
                 if sp500:
                     print(f"Successfully fetched {len(sp500)} S&P 500 tickers from Wikipedia")
