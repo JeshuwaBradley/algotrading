@@ -97,19 +97,54 @@ class DataFetcher:
             given_date = datetime.datetime.strptime(given_date, "%Y-%m-%d")
         date_three_months_before = given_date - relativedelta(months=3)
         return date_three_months_before.strftime('%Y-%m-%d')
-    
+
     @staticmethod
     def get_sp500_tickers() -> List[str]:
-        """Fetch S&P 500 tickers from Wikipedia"""
+        """Fetch S&P 500 tickers from Wikipedia with fallback options"""
         import requests
         from bs4 import BeautifulSoup
         
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-        table = soup.find("table", {"id": "constituents"})
-        rows = table.find_all("tr")[1:]
-        sp500 = []
-        for row in rows:
-            sp500.append(row.find_all('td')[0].text.strip())
-        return sp500
+        # Try primary method
+        try:
+            url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            
+            # Try different table selectors
+            table = soup.find("table", {"id": "constituents"})
+            if not table:
+                table = soup.find("table", {"class": "wikitable sortable"})
+            
+            if table:
+                rows = table.find_all("tr")[1:]  # Skip header
+                sp500 = []
+                for row in rows:
+                    cells = row.find_all('td')
+                    if cells:
+                        ticker = cells[0].text.strip()
+                        # Clean up ticker (remove exchanges in parentheses, etc.)
+                        ticker = ticker.replace('.', '-')  # Convert BRK.B to BRK-B for yfinance
+                        sp500.append(ticker)
+                
+                if sp500:
+                    print(f"Successfully fetched {len(sp500)} S&P 500 tickers from Wikipedia")
+                    return sp500
+        except Exception as e:
+            print(f"Error fetching from Wikipedia primary method: {e}")
+        
+        # Fallback method 1: Hardcoded list of major tickers
+        print("Using fallback ticker list...")
+        fallback_tickers = [
+            "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "BRK-B", "LLY", "V", "JPM",
+            "UNH", "XOM", "MA", "JNJ", "PG", "HD", "COST", "MRK", "ABBV", "CVX",
+            "KO", "PEP", "WMT", "BAC", "TMO", "CSCO", "MCD", "NFLX", "AMD", "INTC",
+            "DIS", "ABT", "CRM", "VZ", "CMCSA", "NKE", "PFE", "TXN", "NEE", "QCOM",
+            "RTX", "HON", "UNP", "LOW", "SPGI", "UPS", "SBUX", "MS", "GS", "C",
+            "BLK", "PLD", "DE", "CAT", "AXP", "AMGN", "GILD", "ADI", "LMT", "MDT",
+            "TMUS", "AMAT", "BKNG", "LRCX", "ELV", "CI", "SYK", "VRTX", "ZTS", "REGN",
+            "BSX", "ADP", "PANW", "ISRG", "MU", "KLAC", "MRNA", "ABNB", "UBER", "LYFT",
+            "DASH", "SNOW", "PLTR", "COIN", "RBLX", "SHOP", "SQ", "PYPL", "ZM", "DOCU"
+        ]
+        print(f"Using fallback list with {len(fallback_tickers)} tickers")
+        return fallback_tickers
