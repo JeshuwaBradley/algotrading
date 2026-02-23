@@ -1,17 +1,18 @@
+import sys
+import os
+# Add the current directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import time
 import datetime
-import os
 import signal
-import sys
 from alpaca.trading.client import TradingClient
 from config import config
-from trading import (
-    DataFetcher, 
-    StockSelector, 
-    ModelTrainer, 
-    Portfolio,
-    Order
-)
+from trading.data_fetcher import DataFetcher
+from trading.stock_selector import StockSelector
+from trading.models import ModelTrainer
+from trading.portfolio import Portfolio
+from trading.order import Order
 from persistence import PortfolioPersistence, UpdateTracker, ModelPersistence
 from utils.helpers import TradingUtils
 import warnings
