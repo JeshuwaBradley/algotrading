@@ -14,7 +14,7 @@ from pathlib import Path
 # Your actual imports based on the repository structure
 from indicators import calculate_technical_indicators, ichimoku, calculate_moving_average, determine_trend_strength
 from config import *
-from scripts.data_fetcher import get_market_data
+from trading.data_fetcher import get_market_data
 from utils.model_storage import ModelStorage
 from utils.portfolio_db import PortfolioDB
 
