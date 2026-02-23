@@ -1,9 +1,11 @@
 import pandas as pd
+import numpy as np
+import time
+from typing import Tuple, List, Optional, Dict, Any
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
-from typing import Tuple, List
 from .indicators import TechnicalIndicators
 from .data_fetcher import DataFetcher
 from config import config
@@ -90,7 +92,6 @@ class ModelTrainer:
         dataframes = []
         for ticker in lst:
             dataframes.append(self.final_vote(ticker, period))
-            import time
             time.sleep(1)
         result = pd.concat(dataframes)
         return result.sample(frac=1, random_state=42)
@@ -124,26 +125,33 @@ class ModelTrainer:
         accuracy = accuracy_score(y_test, preds)
         print(f"Testing model complete! Accuracy: {accuracy}")
         return model
-        
+    
     def save_models(self, buy_sell_model, up_down_model, suffix: str = ""):
         """Save both models"""
-        from persistence import ModelPersistence
-        
-        if suffix:
-            suffix = f"_{suffix}"
-        
-        ModelPersistence.save_xgb_model(buy_sell_model, f"buy_sell_model{suffix}")
-        ModelPersistence.save_rf_model(up_down_model, f"up_down_model{suffix}")
-        print(f"Models saved with suffix: {suffix}")
-
+        try:
+            from persistence import ModelPersistence
+            
+            if suffix:
+                suffix = f"_{suffix}"
+            
+            ModelPersistence.save_xgb_model(buy_sell_model, f"buy_sell_model{suffix}")
+            ModelPersistence.save_rf_model(up_down_model, f"up_down_model{suffix}")
+            print(f"Models saved with suffix: {suffix}")
+        except ImportError:
+            print("Persistence module not available, models not saved")
+    
     def load_models(self, suffix: str = "") -> Tuple[Optional[XGBClassifier], Optional[RandomForestClassifier]]:
         """Load both models"""
-        from persistence import ModelPersistence
-        
-        if suffix:
-            suffix = f"_{suffix}"
-        
-        buy_sell_model = ModelPersistence.load_xgb_model(f"buy_sell_model{suffix}")
-        up_down_model = ModelPersistence.load_rf_model(f"up_down_model{suffix}")
-        
-        return buy_sell_model, up_down_model
+        try:
+            from persistence import ModelPersistence
+            
+            if suffix:
+                suffix = f"_{suffix}"
+            
+            buy_sell_model = ModelPersistence.load_xgb_model(f"buy_sell_model{suffix}")
+            up_down_model = ModelPersistence.load_rf_model(f"up_down_model{suffix}")
+            
+            return buy_sell_model, up_down_model
+        except ImportError:
+            print("Persistence module not available, models not loaded")
+            return None, None
