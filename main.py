@@ -1,317 +1,277 @@
-#!/usr/bin/env python3
-"""
-Algorithmic Trading System with ML Model Persistence and Portfolio Database
-"""
-
-import pandas as pd
-import numpy as np
-from datetime import datetime, date
-import logging
 import time
-import sqlite3
-from pathlib import Path
-
-# Your actual imports based on the repository structure
-from indicators import calculate_technical_indicators, ichimoku, calculate_moving_average, determine_trend_strength
-from config import *
-from trading.data_fetcher import get_market_data
-from utils.model_storage import ModelStorage
-from utils.portfolio_db import PortfolioDB
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('trading_bot.log'),
-        logging.StreamHandler()
-    ]
+import datetime
+import os
+import signal
+import sys
+from alpaca.trading.client import TradingClient
+from config import config
+from trading import (
+    DataFetcher, 
+    StockSelector, 
+    ModelTrainer, 
+    Portfolio,
+    Order
 )
-logger = logging.getLogger(__name__)
+from persistence import PortfolioPersistence, UpdateTracker, ModelPersistence
+from utils.helpers import TradingUtils
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-class AlgoTradingBot:
+
+class TradingBot:
     """Main trading bot class with persistence"""
     
     def __init__(self):
-        """Initialize the trading bot"""
-        logger.info("Initializing AlgoTradingBot...")
+        self.trading_client = TradingClient(config.API_KEY, config.SECRET_KEY, paper=True)
+        self.data_fetcher = DataFetcher()
+        self.stock_selector = StockSelector()
+        self.model_trainer = ModelTrainer()
+        self.trading_utils = TradingUtils()
+        self.portfolio = None
+        self.buy_sell_model = None
+        self.up_down_model = None
+        self.running = True
         
-        # Initialize persistence
-        self.model_storage = ModelStorage(model_dir="saved_models")
-        self.portfolio_db = PortfolioDB(db_path="portfolio.db")
-        
-        # Load or initialize ML model
-        self.ml_model = self.load_or_train_model()
-        
-        # Load previous portfolio state if exists
-        self.portfolio = self.load_or_initialize_portfolio()
-        
-        # Track today's trades for end-of-day summary
-        self.today_trades = []
-        self.today_start_value = self.portfolio['total_value']
-        self.current_date = date.today()
-        
-        logger.info("Initialization complete")
+        # Set up signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
     
-    def load_or_train_model(self):
-        """Load existing ML model or train new one"""
-        model_name = "trading_model"
-        
-        # Try to load existing model
-        model = self.model_storage.load_latest_model(model_name)
-        
-        if model is None:
-            logger.info("No existing model found. Training new model...")
-            
-            # YOUR MODEL TRAINING CODE HERE
-            # Replace with your actual model training logic
-            model = self.train_new_model()
-            
-            # Save the trained model
-            metadata = {
-                'training_date': str(datetime.now()),
-                'model_type': type(model).__name__ if model else 'unknown'
-            }
-            
-            self.model_storage.save_model(model, model_name, metadata)
-            logger.info("New model trained and saved")
-        else:
-            logger.info("Loaded existing model from storage")
-        
-        return model
+    def signal_handler(self, sig, frame):
+        """Handle shutdown signals"""
+        print("\nShutdown signal received. Saving state...")
+        self.running = False
+        self.save_state()
+        sys.exit(0)
     
-    def train_new_model(self):
-        """
-        YOUR EXISTING MODEL TRAINING LOGIC
-        Replace this with whatever training code you currently have
-        """
-        # Example placeholder - replace with your actual code
-        logger.warning("Using placeholder model - REPLACE WITH YOUR ACTUAL MODEL")
-        return None
+    def save_state(self):
+        """Save current state (models and portfolio)"""
+        if self.portfolio:
+            PortfolioPersistence.save_portfolio(self.portfolio)
+        
+        if self.buy_sell_model and self.up_down_model:
+            self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
     
-    def load_or_initialize_portfolio(self):
-        """Load previous portfolio state or initialize new one"""
-        latest = self.portfolio_db.get_latest_portfolio()
+    def load_state(self) -> bool:
+        """Load previous state if exists"""
+        # Try to load portfolio
+        portfolio_state = PortfolioPersistence.load_portfolio()
         
-        if latest:
-            logger.info(f"Loaded previous portfolio from {latest['timestamp']}")
-            portfolio = {
-                'total_value': latest['total_value'],
-                'cash': latest['cash'],
-                'positions': latest['positions']
-            }
-        else:
-            logger.info("Initializing new portfolio")
-            portfolio = {
-                'total_value': INITIAL_CAPITAL,
-                'cash': INITIAL_CAPITAL,
-                'positions': {}
-            }
-            self.portfolio_db.save_portfolio_snapshot(portfolio)
+        # Try to load models
+        self.buy_sell_model, self.up_down_model = self.model_trainer.load_models()
         
-        return portfolio
-    
-    def prepare_features(self, market_data):
-        """Prepare features for ML model using technical indicators"""
-        # Calculate technical indicators
-        df = calculate_technical_indicators(market_data)
-        
-        # Add moving averages
-        df = calculate_moving_average(df, 20, 50)
-        
-        # Add trend strength
-        df = determine_trend_strength(df)
-        
-        # Select features for model
-        feature_columns = ['close', 'volume', 'rsi', 'macd', 'sma_20', 'sma_50', 'trend_strength']
-        features = df[feature_columns].values
-        
-        return features
-    
-    def get_trading_signals(self, market_data):
-        """Generate trading signals using ML model and indicators"""
-        signals = []
-        
-        # Prepare features
-        features = self.prepare_features(market_data)
-        
-        # YOUR SIGNAL GENERATION LOGIC HERE
-        # Use self.ml_model to predict and generate signals
-        
-        return signals
-    
-    def execute_trades(self, signals):
-        """Execute trades and update portfolio"""
-        executed_trades = []
-        
-        for signal in signals:
-            # YOUR TRADE EXECUTION LOGIC HERE
-            # Update self.portfolio['cash'] and self.portfolio['positions']
-            
-            trade = {
-                'symbol': signal.get('symbol', 'UNKNOWN'),
-                'action': signal.get('action', 'BUY'),
-                'quantity': signal.get('quantity', 0),
-                'price': signal.get('price', 0)
-            }
-            executed_trades.append(trade)
-        
-        return executed_trades
-    
-    def calculate_portfolio_value(self, market_data):
-        """Calculate current portfolio value based on positions and current prices"""
-        total = self.portfolio['cash']
-        
-        for symbol, position in self.portfolio['positions'].items():
-            if position > 0 and symbol in market_data:
-                current_price = market_data[symbol]['close'].iloc[-1]
-                total += position * current_price
-        
-        self.portfolio['total_value'] = total
-        return total
-    
-    def update_portfolio(self, market_data, trades=None):
-        """Update portfolio with current values and save to database"""
-        # Update portfolio value based on current prices
-        self.calculate_portfolio_value(market_data)
-        
-        # Calculate returns
-        previous = self.portfolio_db.get_latest_portfolio()
-        returns = {}
-        
-        if previous:
-            returns['daily'] = (self.portfolio['total_value'] - previous['total_value']) / previous['total_value']
-        
-        # Save snapshot
-        snapshot_id = self.portfolio_db.save_portfolio_snapshot(self.portfolio, returns)
-        
-        # Save trades if any
-        if trades:
-            for trade in trades:
-                trade['timestamp'] = datetime.now()
-                self.portfolio_db.save_trade(trade, snapshot_id)
-                self.today_trades.append(trade)
-                logger.info(f"Trade: {trade['action']} {trade['quantity']} {trade['symbol']}")
-        
-        # Check for end of day
-        self.check_end_of_day()
-        
-        return snapshot_id
-    
-    def check_end_of_day(self):
-        """Check if trading day is over and save daily summary"""
-        today = date.today()
-        
-        if today != self.current_date:
-            # Save previous day's summary
-            self.portfolio_db.save_daily_summary(
-                date=self.current_date.isoformat(),
-                start_value=self.today_start_value,
-                end_value=self.portfolio['total_value'],
-                trades_count=len(self.today_trades)
+        if portfolio_state and self.buy_sell_model and self.up_down_model:
+            # Recreate portfolio from saved state
+            self.portfolio = PortfolioPersistence.recreate_portfolio(
+                portfolio_state,
+                self.buy_order_function,
+                self.sell_order_function,
+                self.buy_sell_model,
+                self.up_down_model
             )
-            
-            # Reset for new day
-            self.current_date = today
-            self.today_start_value = self.portfolio['total_value']
-            self.today_trades = []
-            
-            logger.info(f"End of day summary saved for {self.current_date}")
-    
-    def run_iteration(self):
-        """Run one trading iteration"""
-        try:
-            # Get market data for all symbols
-            market_data = {}
-            for symbol in SYMBOLS:
-                market_data[symbol] = get_market_data(symbol)
-            
-            # Generate signals
-            signals = self.get_trading_signals(market_data)
-            
-            # Execute trades if any signals
-            if signals:
-                trades = self.execute_trades(signals)
-                self.update_portfolio(market_data, trades)
-                logger.info(f"Executed {len(trades)} trades")
-            else:
-                # Just update portfolio value
-                self.update_portfolio(market_data)
-            
+            print("Successfully loaded previous state")
             return True
+        elif portfolio_state:
+            print("Loaded portfolio state but models not found")
+        elif self.buy_sell_model and self.up_down_model:
+            print("Loaded models but portfolio state not found")
+        
+        return False
+    
+    def initialize_new_session(self):
+        """Initialize a new trading session"""
+        print("Starting new trading session...")
+        
+        # Select stocks
+        selected_stocks = self.select_stocks()
+        print(f"Selected stocks: {selected_stocks}")
+        
+        # Train or load models
+        if UpdateTracker.should_update():
+            print("Updating models...")
+            self.buy_sell_model, self.up_down_model = self.train_models(selected_stocks)
+            self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
+            UpdateTracker.set_last_update()
+        else:
+            print("Using existing models...")
+            self.buy_sell_model, self.up_down_model = self.model_trainer.load_models()
+            if not self.buy_sell_model or not self.up_down_model:
+                print("Models not found, training new ones...")
+                self.buy_sell_model, self.up_down_model = self.train_models(selected_stocks)
+                self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
+        
+        # Initialize portfolio
+        self.portfolio = Portfolio(
+            stocks=selected_stocks,
+            initial_cash=config.INITIAL_CASH,
+            cash_at_risk=config.CASH_AT_RISK,
+            buy=self.buy_order_function,
+            sell=self.sell_order_function,
+            buy_sell_model=self.buy_sell_model,
+            up_down_model=self.up_down_model
+        )
+    
+    def select_stocks(self) -> list:
+        """Select stocks for trading"""
+        sp500 = DataFetcher.get_sp500_tickers()
+        selected_stocks, _ = self.stock_selector.stock_selecting_code_1(sp500, str(datetime.date.today()))
+        return selected_stocks[:3]
+    
+    def train_models(self, selected_stocks: list):
+        """Train ML models"""
+        buy_sell_model = self.model_trainer.train_xgb_model(selected_stocks)
+        up_down_model = self.model_trainer.train_random_forest_model(selected_stocks)
+        return buy_sell_model, up_down_model
+    
+    def get_previous_day_data(self, ticker: str):
+        """Get predictions for a ticker"""
+        buy_sell_drop = ["ATR", "Tomorrow", "Final"]
+        up_down_drop = ["Lower Band", "Upper Band", "Middle Band", "Band Width", "k", "d", "rsi", "ATR", "Tomorrow", "Final"]
+        
+        data = self.model_trainer.final_vote(ticker, 10)
+        previous_row = data.iloc[-1:]
+        
+        buy_sell_X = previous_row.drop(buy_sell_drop, axis=1)
+        up_down_X = previous_row.drop(up_down_drop, axis=1)
+        
+        buy_sell_pred = self.buy_sell_model.predict(buy_sell_X)
+        up_down_pred = self.up_down_model.predict(up_down_X)
+        
+        current_price, average_fluc = DataFetcher.get_current_stock_price(ticker)
+        
+        print(f"Predictions for {ticker}: Buy/Sell={buy_sell_pred[0]}, Up/Down={up_down_pred[0]}")
+        
+        return buy_sell_pred[0], up_down_pred[0], previous_row, current_price, average_fluc
+    
+    def trading_decision_maker(self, symbol: str, price: float, average_fluc: float, 
+                              buy_sell_pred: int, up_down_pred: int, atr: float, cash: float) -> bool:
+        """Make trading decisions based on predictions"""
+        if buy_sell_pred == 2 and self.portfolio.cash_allocated_per_stock[symbol]["cash"] > float(price):
+            quantity = TradingUtils.calculate_position_size(
+                self.portfolio.cash_allocated_per_stock[symbol]["cash"], 
+                self.portfolio.cash_at_risk, 
+                atr, 
+                price
+            )
+            return self.portfolio.execute_trade(symbol, quantity, price, average_fluc, cash)
+        return False
+    
+    def make_trades(self):
+        """Execute trades based on predictions"""
+        tickers = self.portfolio.stocks
+        cash_available = self.trading_client.get_account().cash
+        
+        self.portfolio.check_on_hold()
+        self.portfolio.check_pending_buys()
+        
+        predictions = {}
+        for ticker in tickers:
+            buy_sell_pred, up_down_pred, stock_data, current_price, average_fluc = self.get_previous_day_data(ticker)
             
-        except Exception as e:
-            logger.error(f"Error in trading iteration: {e}")
-            return False
+            if current_price is not None:
+                predictions[ticker] = {
+                    'buy_sell': buy_sell_pred,
+                    'up_down': up_down_pred,
+                    'price': current_price,
+                    'average_fluc': average_fluc,
+                    'atr': stock_data['ATR'].iloc[0] if 'ATR' in stock_data.columns else 0.5
+                }
+        
+        # Execute trades
+        for ticker, preds in predictions.items():
+            self.trading_decision_maker(
+                ticker, 
+                preds['price'], 
+                preds['average_fluc'], 
+                preds['buy_sell'], 
+                preds['up_down'], 
+                preds['atr'], 
+                cash_available
+            )
+        
+        # Update orders
+        old_prices = {}
+        for order in self.portfolio.orders:
+            if order.symbol in predictions:
+                old_prices[order.symbol] = order.stop_price
+        
+        self.portfolio.update_orders(
+            current_prices={t: p['price'] for t, p in predictions.items()},
+            buy_sell_preds={t: p['buy_sell'] for t, p in predictions.items()},
+            up_down_preds={t: p['up_down'] for t, p in predictions.items()},
+            old_prices=old_prices
+        )
     
-    def analyze_performance(self):
-        """Analyze and display portfolio performance"""
-        history = self.portfolio_db.get_portfolio_history()
+    def buy_order_function(self, stock: str, quantity: int, limit_price: float):
+        """Execute buy order"""
+        from alpaca.trading.requests import LimitOrderRequest
+        from alpaca.trading.enums import OrderSide, TimeInForce
         
-        if history.empty:
-            logger.warning("No historical data available")
-            return
-        
-        initial = history.iloc[0]['total_value']
-        final = history.iloc[-1]['total_value']
-        total_return = (final - initial) / initial
-        
-        logger.info("=" * 50)
-        logger.info("PORTFOLIO PERFORMANCE")
-        logger.info("=" * 50)
-        logger.info(f"Initial Value: ${initial:.2f}")
-        logger.info(f"Current Value: ${final:.2f}")
-        logger.info(f"Total Return: {total_return:.2%}")
-        logger.info(f"Trading Days: {len(history)}")
-        logger.info("=" * 50)
-    
-    def run(self, continuous=True, interval_seconds=60):
-        """Main run loop"""
-        logger.info("Starting trading bot...")
+        rounded_price = round(limit_price, 2)
+        limitOrder = LimitOrderRequest(
+            symbol=stock,
+            limit_price=rounded_price,
+            qty=quantity,
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.DAY
+        )
         
         try:
-            if continuous:
-                while True:
-                    self.run_iteration()
-                    time.sleep(interval_seconds)
-            else:
-                self.run_iteration()
-            
-            self.analyze_performance()
-            
-        except KeyboardInterrupt:
-            logger.info("Shutting down...")
-            self.analyze_performance()
+            buy_limit_order = self.trading_client.submit_order(order_data=limitOrder)
+            print(f"Successfully placed limit buy order for {quantity} shares of {stock}")
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            raise
+            print(f"Error placing order: {e}")
+    
+    def sell_order_function(self, stock: str, quantity: int):
+        """Execute sell order"""
+        from alpaca.trading.requests import MarketOrderRequest
+        from alpaca.trading.enums import OrderSide, TimeInForce
+        
+        marketOrder = MarketOrderRequest(
+            symbol=stock,
+            qty=quantity,
+            side=OrderSide.SELL,
+            time_in_force=TimeInForce.DAY
+        )
+        
+        try:
+            sell_market_order = self.trading_client.submit_order(order_data=marketOrder)
+            print(f"Successfully placed market sell order for {quantity} shares of {stock}")
+            return sell_market_order
+        except Exception as e:
+            print(f"Error placing order: {e}")
+    
+    def run(self):
+        """Main trading loop"""
+        # Try to load previous state
+        if not self.load_state():
+            self.initialize_new_session()
+        
+        # Trading loop
+        bad_trades_count = self.portfolio.bad_trades if self.portfolio else 0
+        
+        while self.running and self.trading_utils.is_market_open(self.trading_client):
+            if bad_trades_count >= 3:
+                print("Too many bad trades, stopping trading")
+                break
+            
+            self.make_trades()
+            self.trading_utils.display_portfolio(self.trading_client, self.portfolio)
+            
+            # Save state periodically (every hour)
+            if datetime.datetime.now().minute == 0:
+                self.save_state()
+            
+            time.sleep(15 * 60)  # Wait 15 minutes
+        
+        print("Market closed")
+        self.save_state()
+
 
 def main():
-    """Main entry point"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Algorithmic Trading Bot')
-    parser.add_argument('--once', action='store_true', help='Run once and exit')
-    parser.add_argument('--interval', type=int, default=60, help='Interval between iterations')
-    parser.add_argument('--analyze', action='store_true', help='Analyze existing data')
-    
-    args = parser.parse_args()
-    
-    if args.analyze:
-        db = PortfolioDB()
-        history = db.get_portfolio_history()
-        if not history.empty:
-            print("\nPortfolio History:")
-            print(history[['timestamp', 'total_value', 'cash']].tail(10).to_string())
-            
-            initial = history.iloc[0]['total_value']
-            final = history.iloc[-1]['total_value']
-            print(f"\nTotal Return: {(final - initial) / initial:.2%}")
-        return
-    
-    # Create and run bot
-    bot = AlgoTradingBot()
-    bot.run(continuous=not args.once, interval_seconds=args.interval)
+    """Entry point"""
+    bot = TradingBot()
+    bot.run()
+
 
 if __name__ == "__main__":
     main()
