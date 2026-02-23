@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any
 from .order import Order
 from config import config
 import copy
+import datetime
 
 
 class Portfolio:
@@ -27,32 +28,6 @@ class Portfolio:
         
         # Initialize cash allocation
         self._initialize_cash_allocation()
-        
-    def get_state(self) -> Dict[str, Any]:
-        """Get portfolio state for persistence"""
-        return {
-            'stocks': self.stocks,
-            'initial_cash': self.initial_cash,
-            'cash': self.cash,
-            'cash_at_risk': self.cash_at_risk,
-            'bad_trades': self.bad_trades,
-            'day_trade_count': self.day_trade_count,
-            'pending_buys': self.pending_buys,
-            'on_hold_until': self.on_hold_until,
-            'cash_allocated_per_stock': self.cash_allocated_per_stock,
-            'next_stocks': self.next_stocks,
-            'orders': [
-                {
-                    'symbol': order.symbol,
-                    'quantity': order.quantity,
-                    'entry_price': order.entry_price,
-                    'trailing_distance': order.trailing_distance,
-                    'stop_price': order.stop_price,
-                    'old_stop_loss_price': order.old_stop_loss_price
-                }
-                for order in self.orders
-            ]
-        }
     
     def _initialize_cash_allocation(self):
         """Initialize cash allocation for each stock"""
@@ -84,7 +59,6 @@ class Portfolio:
     
     def check_on_hold(self):
         """Check if any stocks are on hold"""
-        import datetime
         current_time = datetime.datetime.now()
         expired_stocks = []
         for stock, hold_until in self.on_hold_until.items():
@@ -96,7 +70,6 @@ class Portfolio:
     
     def check_pending_buys(self):
         """Check pending buy orders"""
-        import datetime
         current_time = datetime.datetime.now()
         expired_orders = []
         
@@ -150,3 +123,29 @@ class Portfolio:
                 new_orders.append(order)
         
         self.orders = new_orders
+    
+    def get_state(self) -> Dict[str, Any]:
+        """Get portfolio state for persistence"""
+        return {
+            'stocks': self.stocks,
+            'initial_cash': self.initial_cash,
+            'cash': self.cash,
+            'cash_at_risk': self.cash_at_risk,
+            'bad_trades': self.bad_trades,
+            'day_trade_count': self.day_trade_count,
+            'pending_buys': self.pending_buys,
+            'on_hold_until': self.on_hold_until,
+            'cash_allocated_per_stock': self.cash_allocated_per_stock,
+            'next_stocks': self.next_stocks,
+            'orders': [
+                {
+                    'symbol': order.symbol,
+                    'quantity': order.quantity,
+                    'entry_price': order.entry_price,
+                    'trailing_distance': order.trailing_distance,
+                    'stop_price': order.stop_price,
+                    'old_stop_loss_price': order.old_stop_loss_price
+                }
+                for order in self.orders
+            ]
+        }
