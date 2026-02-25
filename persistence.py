@@ -100,6 +100,8 @@ class ModelPersistence:
 class PortfolioPersistence:
     """Handles saving and loading portfolio state"""
     
+    # In persistence.py, update the save_portfolio method:
+
     @staticmethod
     def save_portfolio(portfolio: Portfolio, filepath: str = config.PORTFOLIO_STATE_FILE):
         """Save portfolio state to JSON"""
@@ -112,12 +114,17 @@ class PortfolioPersistence:
             'day_trade_count': portfolio.day_trade_count,
             'pending_buys': {
                 symbol: {
-                    'expiry': info['expiry'].isoformat() if isinstance(info['expiry'], datetime.datetime) else info['expiry']
+                    'order_id': info['order_id'],
+                    'symbol': info['symbol'],
+                    'qty': info['qty'],
+                    'price': info['price'],
+                    'timestamp': info['timestamp'].isoformat() if isinstance(info['timestamp'], datetime.datetime) else info['timestamp']
+                    # REMOVED: 'expiry' key that doesn't exist
                 }
                 for symbol, info in portfolio.pending_buys.items()
             },
             'on_hold_until': {
-                symbol: hold_until.isoformat() if isinstance(hold_until, datetime.datetime) else hold_until
+                symbol: hold_until.isoformat() if isinstance(hold_until, (datetime.datetime, datetime.date)) else hold_until
                 for symbol, hold_until in portfolio.on_hold_until.items()
             },
             'cash_allocated_per_stock': portfolio.cash_allocated_per_stock,
@@ -129,7 +136,10 @@ class PortfolioPersistence:
                     'entry_price': order.entry_price,
                     'trailing_distance': order.trailing_distance,
                     'stop_price': order.stop_price,
-                    'old_stop_loss_price': order.old_stop_loss_price
+                    'old_stop_loss_price': order.old_stop_loss_price,
+                    'short': order.short,
+                    'dynamic_stop_active': order.dynamic_stop_active,
+                    'best_price': order.best_price
                 }
                 for order in portfolio.orders
             ]

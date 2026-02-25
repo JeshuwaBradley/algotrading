@@ -216,12 +216,15 @@ class Portfolio:
         try:
             buy_order = self.buy(stock=symbol, quantity=quantity, limit_price=price)
             
+            # Get order ID properly
+            order_id = buy_order.id if hasattr(buy_order, 'id') else str(buy_order)
+            
             self.pending_buys[symbol] = {
-                "order_id": buy_order.id if hasattr(buy_order, 'id') else buy_order,
+                "order_id": order_id,
                 "symbol": symbol,
                 "qty": quantity,
                 "price": price,
-                "timestamp": datetime.datetime.now()
+                "timestamp": datetime.datetime.now()  # This is the only timestamp field
             }
             
             print(f"[BUY PENDING] {symbol} – waiting to fill…")
@@ -239,7 +242,7 @@ class Portfolio:
             
         to_delete = []
         
-        for symbol, info in self.pending_buys.items():
+        for symbol, info in list(self.pending_buys.items()):  # Use list() to avoid modification during iteration
             order_id = info["order_id"]
             qty = info["qty"]
             price = info["price"]
@@ -276,7 +279,12 @@ class Portfolio:
                     )
                     self.orders.append(new_order)
                     
+                    # Mark the cash as used (it was already marked, but ensure it's correct)
+                    if symbol in self.cash_allocated_per_stock:
+                        self.cash_allocated_per_stock[symbol]["used"] = True
+                    
                     to_delete.append(symbol)
+                    print(f"Order added to portfolio. Total orders: {len(self.orders)}")
                     continue
                 
                 # Case 2 — Not filled after 15 min: cancel & re-place
@@ -291,10 +299,14 @@ class Portfolio:
                     
             except Exception as e:
                 print(f"Error checking pending buy order for {symbol}: {e}")
+                # If order not found, remove it from pending
+                if "not found" in str(e).lower():
+                    to_delete.append(symbol)
         
         # remove symbols whose orders filled
         for symbol in to_delete:
-            del self.pending_buys[symbol]
+            if symbol in self.pending_buys:
+                del self.pending_buys[symbol]
     
     def execute_trade(self, symbol: str, quantity: int, price: float, 
                      average_fluc: float, cash: float) -> bool:

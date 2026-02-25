@@ -41,16 +41,40 @@ class TradingBot:
         """Handle shutdown signals"""
         print("\nShutdown signal received. Saving state...")
         self.running = False
-        self.save_state()
+        try:
+            self.save_state()
+            print("State saved successfully")
+        except Exception as e:
+            print(f"Error saving state: {e}")
+            # Try to save again with error handling
+            try:
+                if self.portfolio:
+                    # Manual save as fallback
+                    import json
+                    from persistence import DateTimeEncoder
+                    state = self.portfolio.get_state()
+                    with open('portfolio_state.json', 'w') as f:
+                        json.dump(state, f, cls=DateTimeEncoder, indent=2)
+                    print("Fallback save completed")
+            except:
+                print("Could not save state")
         sys.exit(0)
-    
+
     def save_state(self):
         """Save current state (models and portfolio)"""
         if self.portfolio:
-            PortfolioPersistence.save_portfolio(self.portfolio)
+            try:
+                PortfolioPersistence.save_portfolio(self.portfolio)
+                print("Portfolio state saved")
+            except Exception as e:
+                print(f"Error saving portfolio: {e}")
         
         if self.buy_sell_model and self.up_down_model:
-            self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
+            try:
+                self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
+                print("Models saved")
+            except Exception as e:
+                print(f"Error saving models: {e}")
     
     def load_state(self) -> bool:
         """Load previous state if exists"""
