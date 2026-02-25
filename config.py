@@ -2,12 +2,18 @@
 from dataclasses import dataclass
 from typing import List, Optional
 import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load .env file with absolute path
+env_path = Path('/home/algotradingstrategist/algotrading/.env')
+load_dotenv(dotenv_path=env_path)
 
 @dataclass
 class Config:
     # API 
-    API_KEY = os.getenv("ALPACA_API_KEY")
-    SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+    API_KEY = os.getenv("API_KEY")
+    SECRET_KEY = os.getenv("SECRET_KEY")
     BASE_URL: str = "https://paper-api.alpaca.markets/v2"
     
     # Trading Parameters
