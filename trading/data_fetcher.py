@@ -114,10 +114,12 @@ class DataFetcher:
             sp500 = []
             for row in rows:
                 sp500.append(row.find_all('td')[1].text.strip())
-                
-                if sp500:
-                    print(f"Successfully fetched {len(sp500)} S&P 500 tickers from Wikipedia")
-                    return sp500
+            
+            if sp500:
+                print(f"Successfully fetched {len(sp500)} S&P 500 tickers from Wikipedia")
+                return sp500
+            else:
+                print("No tickers found in table, using fallback...")
         except Exception as e:
             print(f"Error fetching from Wikipedia primary method: {e}")
         
