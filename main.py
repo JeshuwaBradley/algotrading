@@ -61,16 +61,18 @@ class TradingBot:
         self.buy_sell_model, self.up_down_model = self.model_trainer.load_models()
         
         if portfolio_state and self.buy_sell_model and self.up_down_model:
-            # Recreate portfolio from saved state
+            # Recreate portfolio from saved state - ADD trading_client here!
             self.portfolio = PortfolioPersistence.recreate_portfolio(
                 portfolio_state,
                 self.buy_order_function,
                 self.sell_order_function,
+                self.trading_client,  # <-- ADD THIS ARGUMENT
                 self.buy_sell_model,
                 self.up_down_model
             )
             print("Successfully loaded previous state")
             return True
+        # ... rest of method
         elif portfolio_state:
             print("Loaded portfolio state but models not found")
         elif self.buy_sell_model and self.up_down_model:
@@ -78,6 +80,8 @@ class TradingBot:
         
         return False
     
+    # In TradingBot class, update initialize_new_session method:
+
     def initialize_new_session(self):
         """Initialize a new trading session"""
         print("Starting new trading session...")
@@ -100,13 +104,14 @@ class TradingBot:
                 self.buy_sell_model, self.up_down_model = self.train_models(selected_stocks)
                 self.model_trainer.save_models(self.buy_sell_model, self.up_down_model)
         
-        # Initialize portfolio
+        # Initialize portfolio - ADD trading_client here!
         self.portfolio = Portfolio(
             stocks=selected_stocks,
             initial_cash=config.INITIAL_CASH,
             cash_at_risk=config.CASH_AT_RISK,
             buy=self.buy_order_function,
             sell=self.sell_order_function,
+            trading_client=self.trading_client,  # <-- ADD THIS LINE
             buy_sell_model=self.buy_sell_model,
             up_down_model=self.up_down_model
         )

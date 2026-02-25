@@ -151,7 +151,7 @@ class PortfolioPersistence:
     
     @staticmethod
     def recreate_portfolio(portfolio_state: Dict[str, Any], buy_func, sell_func, 
-                          buy_sell_model=None, up_down_model=None) -> Portfolio:
+                          trading_client=None, buy_sell_model=None, up_down_model=None) -> Portfolio:
         """Recreate portfolio object from saved state"""
         portfolio = Portfolio(
             stocks=portfolio_state['stocks'],
@@ -159,6 +159,7 @@ class PortfolioPersistence:
             cash_at_risk=portfolio_state['cash_at_risk'],
             buy=buy_func,
             sell=sell_func,
+            trading_client=trading_client,  # <-- ADD THIS
             buy_sell_model=buy_sell_model,
             up_down_model=up_down_model
         )
@@ -167,23 +168,44 @@ class PortfolioPersistence:
         portfolio.cash = portfolio_state['cash']
         portfolio.bad_trades = portfolio_state['bad_trades']
         portfolio.day_trade_count = portfolio_state['day_trade_count']
-        portfolio.pending_buys = portfolio_state['pending_buys']
-        portfolio.on_hold_until = portfolio_state['on_hold_until']
-        portfolio.cash_allocated_per_stock = portfolio_state['cash_allocated_per_stock']
-        portfolio.next_stocks = portfolio_state['next_stocks']
+        portfolio.next_stocks = portfolio_state.get('next_stocks', [])
         
-        # Restore orders
-        portfolio.orders = [
-            Order(
+        # Restore pending buys (with datetime conversion)
+        portfolio.pending_buys = {}
+        for symbol, info in portfolio_state.get('pending_buys', {}).items():
+            if isinstance(info.get('timestamp'), str):
+                info['timestamp'] = datetime.datetime.fromisoformat(info['timestamp'])
+            portfolio.pending_buys[symbol] = info
+        
+        # Restore on_hold_until
+        portfolio.on_hold_until = {}
+        for symbol, hold_until in portfolio_state.get('on_hold_until', {}).items():
+            if isinstance(hold_until, str):
+                try:
+                    portfolio.on_hold_until[symbol] = datetime.datetime.fromisoformat(hold_until)
+                except:
+                    portfolio.on_hold_until[symbol] = hold_until
+            else:
+                portfolio.on_hold_until[symbol] = hold_until
+        
+        # Restore cash allocation
+        portfolio.cash_allocated_per_stock = portfolio_state.get('cash_allocated_per_stock', {})
+        
+        # Restore orders - now with all fields
+        portfolio.orders = []
+        for order_data in portfolio_state.get('orders', []):
+            order = Order(
                 symbol=order_data['symbol'],
                 quantity=order_data['quantity'],
                 entry_price=order_data['entry_price'],
                 trailing_distance=order_data['trailing_distance'],
                 stop_price=order_data['stop_price'],
-                old_stop_loss_price=order_data.get('old_stop_loss_price')
+                old_stop_loss_price=order_data.get('old_stop_loss_price'),
+                short=order_data.get('short', False),
+                dynamic_stop_active=order_data.get('dynamic_stop_active', False),
+                best_price=order_data.get('best_price', order_data['entry_price'])
             )
-            for order_data in portfolio_state['orders']
-        ]
+            portfolio.orders.append(order)
         
         return portfolio
 

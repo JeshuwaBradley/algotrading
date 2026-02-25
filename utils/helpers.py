@@ -10,7 +10,19 @@ class TradingUtils:
     @staticmethod
     def is_market_open(trading_client: TradingClient) -> bool:
         """Check if market is open"""
-        return trading_client.get_clock().is_open
+        try:
+            return trading_client.get_clock().is_open
+        except:
+            # Fallback to time check if API fails
+            import datetime
+            import pytz
+            now = datetime.datetime.now(pytz.timezone('US/Eastern'))
+            # Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday
+            if now.weekday() >= 5:  # Weekend
+                return False
+            market_open = datetime.time(9, 30)
+            market_close = datetime.time(16, 0)
+            return market_open <= now.time() <= market_close
     
     @staticmethod
     def return_time() -> datetime.time:
